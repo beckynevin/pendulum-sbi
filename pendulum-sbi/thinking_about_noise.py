@@ -39,17 +39,21 @@ from sbi.inference import SNPE, prepare_for_sbi, simulate_for_sbi
 from sbi.utils.get_nn_models import posterior_nn
 from sbi.analysis import pairplot
 
-noiz = False
+# If noise is on or off for each parameter
+# g, L, theta_not
+noiz = [0.1, 0, 0]
 
 # num_dim is the number of parameters were controlling (g, L, )
-num_dim = 4
+num_dim = 3
 prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
 
 
 
 
 
-
+# This is the simulator
+# Option is to input the width of the noise normal distributions
+# around each parameter.
 def create_t_p_q_noise(theta, seed=None, noise=[0.1,0.1,0.1]):
     """
     Return an t, x, y array for plotting based on params
@@ -100,7 +104,7 @@ def create_t_p_q_noise(theta, seed=None, noise=[0.1,0.1,0.1]):
 
 
 def eval(theta, t, seed=None, noise = False):
-    """Evaluate the pendulum at `t`"""
+    """Evaluate the pendulum at time `t`"""
     starting_theta = np.pi / 4
 
     if theta.ndim == 1:
@@ -131,6 +135,12 @@ def eval(theta, t, seed=None, noise = False):
         #* theta[:, 1] ( np.sin(theta[:, 2] * np.cos( np.sqrt(theta[:, 0] / theta[:, 1]) * ts)) * theta[:, 1] )
         dy_dt = theta[:, 2] * theta[:, 1] * (- np.sqrt(theta[:, 0] / theta[:, 1])) * np.sin(t * np.sqrt(theta[:, 0] / theta[:, 1])) * np.sin(theta[:, 2] * np.cos(t * np.sqrt(theta[:, 0] / theta[:, 1])))
     return x, y, dx_dt, dy_dt
+
+
+# Below are the two summary statistics I'm using to optimize the SBI, one of them gets MSE
+# for all of the positions and momentum for every moment in time in the time series
+# one of them grabs just four moments in time
+# As you might expect, the MSE one does better
 
 def get_MSE(theta, theta_o, seed=None):
     """
