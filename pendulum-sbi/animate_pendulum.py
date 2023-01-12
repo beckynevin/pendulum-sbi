@@ -54,23 +54,23 @@ def create_t_p_q_noise(theta, noise=[0.1,0.1,0.1]):
     Ls = np.random.normal(loc=theta[0][1], scale=noise[1], size=len(t))
     theta_os =  np.random.normal(loc=theta[0][2], scale=noise[2], size=len(t))
 
-    '''
-    plt.scatter(t, gs, label='gs')
-    plt.scatter(t, Ls, label='Ls')
-    plt.scatter(t, theta_os, label='thetas')
-    plt.legend()
-    plt.show()
-    '''
-        
-
-
     # Okay from this then write q and p
-    
-    x = np.array([np.sin(theta_os[i] * np.cos( np.sqrt(gs[i] / Ls[i]) * t[i])) * Ls[i] for i, _ in enumerate(t)])
-    y = np.array([Ls[i] - np.cos(theta_os[i] * np.cos(np.sqrt(gs[i] / Ls[i]) * t[i])) * Ls[i] for i, _ in enumerate(t)])
 
-    dx_dt = np.array([theta_os[i] * Ls[i] * (- np.sqrt( gs[i] / Ls[i])) * np.sin( t[i] * np.sqrt( gs[i] / Ls[i])) * np.cos(theta_os[i] * np.cos(t[i] * np.sqrt( gs[i] / Ls[i]))) for i, _ in enumerate(t)])
-    dy_dt = np.array([theta_os[i] * Ls[i] * (- np.sqrt( gs[i] / Ls[i])) * np.sin( t[i] * np.sqrt( gs[i] / Ls[i])) * np.sin(theta_os[i] * np.cos(t[i] * np.sqrt( gs[i] / Ls[i]))) for i, _ in enumerate(t)])
+    # From chatGPT
+    theta_t = np.array([theta_os[i] * math.cos(np.sqrt(gs[i] / Ls[i]) * t[i]) for i, _ in enumerate(t)])
+    x = np.array([Ls[i] * math.sin(theta_t[i]) for i, _ in enumerate(t)])
+    y = np.array([-Ls[i] * math.cos(theta_t[i]) for i, _ in enumerate(t)])
+
+    # Okay and what about taking the time derivative?
+    dx_dt = np.array([-Ls[i] * theta_os[i] * np.sqrt(gs[i] / Ls [i]) * math.cos(theta_t[i]) * math.sin( np.sqrt(gs[i] / Ls[i]) * t[i]) for i, _ in enumerate(t)])
+    dy_dt = np.array([-Ls[i] * theta_os[i] * np.sqrt(gs[i] / Ls [i]) * math.sin(theta_t[i]) * math.sin( np.sqrt(gs[i] / Ls[i]) * t[i]) for i, _ in enumerate(t)])
+    
+
+    #x = np.array([np.sin(theta_os[i] * np.cos( np.sqrt(gs[i] / Ls[i]) * t[i])) * Ls[i] for i, _ in enumerate(t)])
+    #y = np.array([Ls[i] - np.cos(theta_os[i] * np.cos(np.sqrt(gs[i] / Ls[i]) * t[i])) * Ls[i] for i, _ in enumerate(t)])
+
+    #dx_dt = np.array([theta_os[i] * Ls[i] * (- np.sqrt( gs[i] / Ls[i])) * np.sin( t[i] * np.sqrt( gs[i] / Ls[i])) * np.cos(theta_os[i] * np.cos(t[i] * np.sqrt( gs[i] / Ls[i]))) for i, _ in enumerate(t)])
+    #dy_dt = np.array([theta_os[i] * Ls[i] * (- np.sqrt( gs[i] / Ls[i])) * np.sin( t[i] * np.sqrt( gs[i] / Ls[i])) * np.sin(theta_os[i] * np.cos(t[i] * np.sqrt( gs[i] / Ls[i]))) for i, _ in enumerate(t)])
     
 
     return t, x, y, dx_dt, dy_dt
@@ -176,25 +176,44 @@ plt.show()
 
 plt.clf()
 # Create the figure and axis
-fig, ax = plt.subplots()
+#fig, axs = plt.subplots(nrows = 1, ncols = 2)
+fig = plt.figure(figsize = (10,3))
+ax1 = fig.add_subplot(121)
+ax2 = fig.add_subplot(122)
   
 # Define the function to update the plot at each time step
 def update(i):
     # Calculate the position and velocity at the current time step
     
     # Clear the previous plot
-    ax.clear()
+    #ax1.clear()
 
     # Plot the position of the pendulum
     xnow = x[i]
     ynow = y[i]
-    print(xnow, ynow)
-    ax.plot([xnow,0],[ynow,1.4])
-    ax.scatter(xnow, ynow)#, markersize=10)
+
+    dxnow = mom_x[i]
+    dynow = mom_y[i]
+    
+    ax1.plot([xnow,0],[ynow,1.4])
+    ax1.scatter(xnow, ynow)#, markersize=10)
+    ax1.set_title('x = '+str(round(xnow, 1))+', y = '+str(round(ynow, 1)))
+    
 
     # Set the axis limits
-    ax.set_xlim(-5, 5)
-    ax.set_ylim(0, 1.5)
+    ax1.set_xlim(-5, 5)
+    ax1.set_ylim(-7, 3)#0, 1.5)
+
+
+    #ax2.plot([mom_x],[mom_y])
+    ax2.set_title('mom_x = '+str(round(dxnow, 1))+', mom_y = '+str(round(dynow, 1)))
+    ax2.scatter(dxnow, dynow)#, markersize=10)
+
+    # Set the axis limits
+    ax2.set_xlim(-10, 10)
+    ax2.set_ylim(-3, 3)#0, 1.5)
+
+    #ax.annotate('L = '+str())
     
     #plt.scatter(x, y, c = t,  alpha = 0.5)
   
