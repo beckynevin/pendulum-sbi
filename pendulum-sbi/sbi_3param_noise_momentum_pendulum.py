@@ -33,7 +33,7 @@ noiz = [0.1,0.0,0.0] # here, there's only noise on g
 # around each parameter.
 # default is a bit of noise for each of the three parameters
 
-def create_t_p_q_noise(theta, noise=[0.1,0.1,0.1]):
+def create_t_p_q_noise(theta, t = np.linspace(0, 10, 200), noise=[0.1,0.1,0.1]):
     """
     Return an t, x, y array for plotting based on params
     Also introduces noise to parameter draws    
@@ -44,7 +44,7 @@ def create_t_p_q_noise(theta, noise=[0.1,0.1,0.1]):
     # Decide on time, here I'm sampling a few oscillations, but this could be
     # something you import or change
     
-    t = np.linspace(0, 10, 200)
+    
     ts = np.repeat(t[:, np.newaxis], theta.shape[0], axis=1)
 
 
@@ -112,7 +112,7 @@ def create_t_p_q_noise(theta, noise=[0.1,0.1,0.1]):
 
 # TO DO: probably could just use the above function and get rid of time
 
-def eval_for_all_time(theta, noise):
+def eval_for_all_time(theta, t = np.linspace(0, 10, 200), noise = [0.1, 0.1, 0.1]):
     """Evaluate the pendulum at all times"""
 
     # nested for loop
@@ -138,7 +138,7 @@ def eval_for_all_time(theta, noise):
     return x, y, dx_dt, dy_dt
 
 # Similar to the above but draws at one specific moment in time
-def eval(theta, t, noise):
+def eval(theta, t, noise = [0.1, 0.1, 0.1]):
     """
     Evaluate the pendulum at time `t`
     But you still need to account for multiple draws of theta
@@ -181,7 +181,12 @@ def get_MSE(theta, theta_o, noise = [0.1,0.1,0.1]):
     Return the mean-squared error (MSE) i.e. Euclidean distance from the observation function
     """
     _, x, y, mom_x, mom_y = create_t_p_q_noise(theta_o, noise = noise)  # truth
+    
     _, x_, y_, mom_x_, mom_y_ = create_t_p_q_noise(theta, noise = noise)  # simulations
+    print(np.shape(mom_x))
+    print(np.shape(np.mean(np.sqrt(np.square(y_ - y) + np.square(x_ - x) + np.square(mom_y_ - mom_y) + np.square(mom_x_ - mom_x)), axis=0, keepdims=True).T))
+    print(np.shape(np.mean(np.sqrt(np.square(y_ - y) + np.square(x_ - x) + np.square(mom_y_ - mom_y) + np.square(mom_x_ - mom_x)), axis=0, keepdims=True)))
+    STOP
     return np.mean(np.sqrt(np.square(y_ - y) + np.square(x_ - x) + np.square(mom_y_ - mom_y) + np.square(mom_x_ - mom_x)), axis=0, keepdims=True).T  # MSE
 
 # Another SBI optimization tool, this uses the position and velocities at multiple specific moments in time
@@ -379,6 +384,7 @@ inference = SNPE(prior)
 # Now give it what you want, which is a tool that will connect the summary
 # statistic with thetas
 # and train
+print('theta shape', np.shape(theta), 'x shape', np.shape(x))
 _ = inference.append_simulations(theta, x).train()
 
 # from that build a posterior
@@ -451,6 +457,8 @@ x = get_MSE(theta.numpy(), theta_o, noise = noiz)
 theta = torch.as_tensor(theta, dtype=torch.float32)
 x = torch.as_tensor(x, dtype=torch.float32)
 
+print('theta shape', np.shape(theta), 'x shape', np.shape(x))
+
 # Sets up the neural posterior estimator
 inference = SNPE(prior)
 # Links theta and data through the MSE (x), 
@@ -489,7 +497,7 @@ plt.show()
 x_o_t, x_o_x, x_o_y, mom_o_x, mom_o_y = create_t_p_q_noise(theta_o)
 plt.plot(x_o_t, x_o_x, "k", zorder=1, label="truth")
 
-theta_p = posterior.sample((10,), x=x_o)
+theta_p = posterior.sample((n_samples,), x=x_o)
 x_t, x_x, x_y, mom_x, mom_y = create_t_p_q_noise(theta_p.numpy())
 plt.plot(x_t, x_x, "grey", zorder=0)
 plt.ylabel('pos in x')
