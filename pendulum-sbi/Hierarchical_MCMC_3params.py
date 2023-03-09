@@ -29,6 +29,7 @@ from sbi.analysis import pairplot
 
 # stuff for MCMC:
 import emcee
+import corner
 
 
 
@@ -123,18 +124,27 @@ def log_prior_uniform(theta):
 
 def log_prior_normal(theta):
     g, L, theta_0 = theta
-    print('input', g, L, theta_0)
+    
     # right off the bat, disallow negative numbers:
     if g < 0.0 or L < 0.0 or theta_0 < 0.0 or theta_0 > np.pi/2:
         prior = -np.inf
-        print('prior disallowed', prior)
+        
         return prior
     mu_g, sigma_g = 10, 2
     mu_L, sigma_L = 5, 2
     mu_theta_0, sigma_theta_0 = 0.75, 0.2
     prior = np.log(1.0/(np.sqrt(2*np.pi)*sigma_g))-0.5*(g-mu_g)**2/sigma_g**2 + np.log(1.0/(np.sqrt(2*np.pi)*sigma_L))-0.5*(L - mu_L)**2/sigma_L**2 + np.log(1.0/(np.sqrt(2*np.pi)*sigma_theta_0))-0.5*(theta_0 - mu_theta_0)**2/sigma_theta_0**2
-    print('prior', prior)
+    
     return prior
+
+def log_prior_normal_g(g):
+    if g < 0.0:
+        prior = -np.inf
+        return prior
+    mu_g, sigma_g = 10, 2
+    #prior = np.log(1.0/(np.sqrt(2*np.pi)*sigma_g))-0.5*(g-mu_g)**2/sigma_g**2 + np.log(1.0/(np.sqrt(2*np.pi)*sigma_L))-0.5*(L - mu_L)**2/sigma_L**2 + np.log(1.0/(np.sqrt(2*np.pi)*sigma_theta_0))-0.5*(theta_0 - mu_theta_0)**2/sigma_theta_0**2
+    
+    return np.log(1.0/(np.sqrt(2*np.pi)*sigma_g))-0.5*(g-mu_g)**2/sigma_g**2
 
 
 
@@ -146,11 +156,13 @@ def log_probability(theta, t, y, yerr):
         return -np.inf
 
     p_density =  lp + log_likelihood(theta, t, y, yerr)
+    '''
     if p_density < -15:
         print('input values', theta)
         print('posterior density', p_density)
         print('prior', lp)
         print('log likelihood', log_likelihood(theta, t, y, yerr))
+    '''
     return p_density
 
 # The next step is to implement SBI using the Macklab example from:
@@ -217,9 +229,9 @@ mu_theta_0, sigma_theta_0 = 0.75, 0.2
     
 
 
-g_sample = np.random.normal(loc = mu_g, scale = sigma_g, size = 10)
-L_sample = np.random.normal(loc = mu_L, scale = sigma_L, size = 10)
-theta_0_sample = np.random.normal(loc = mu_theta_0, scale = sigma_theta_0, size = 10)
+g_sample = np.random.normal(loc = mu_g, scale = sigma_g, size = 3)
+L_sample = np.random.normal(loc = mu_L, scale = sigma_L, size = 3)
+theta_0_sample = np.random.normal(loc = mu_theta_0, scale = sigma_theta_0, size = 3)
 
 plt.clf()
 for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
@@ -229,7 +241,7 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
 plt.show()
 
 # Now run an MCMC for all of these:
-run = True
+run = False
 counter = 0
 
 for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
@@ -240,6 +252,7 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
     # Don't forget to clear it in case the file already exists
         true = np.array([g, L, theta_0])
         y = simulator(true, t = t)
+        yerr = 0.05 * np.ones(np.shape(y))
     
         backend = emcee.backends.HDFBackend(filename)
         backend.reset(nwalkers, ndim)
@@ -262,6 +275,8 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
         ax = axes[i]
         ax.plot(samples[:, :, i], "k", alpha=0.3)
         ax.set_xlim(0, len(samples))
+        if run:
+            ax.axhline(y = true[i])
         ax.set_ylabel(labels[i])
         ax.yaxis.set_label_coords(-0.1, 0.5)
 
@@ -270,8 +285,36 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
 
     flat_samples = sampler.get_chain(discard=100, thin=15, flat=True)
     print(flat_samples.shape)
+    # Now build the hierarchical part by sampling K samples from these chains
+    # Currently they can just have the above shape
 
-    import corner
+    print(flat_samples)
+    # So for each of these we're just grabbing the g values?
+    print(flat_samples[:,0])
+
+    # Now how do we solve for the best fit alpha values?
+
+    STOP
+
+    def f(g, alpha):
+        a, b = alpha
+        return g**(a-1)*(1-g)**(b-1)
+
+    def likelihood_alpha():
+        return np.sum(f(g,alpha)/log_prior_normal_g(g))
+    
+    def log_probability(alpha, t, y, yerr):
+    
+        lp = log_prior_normal(theta)
+        if not np.isfinite(lp):
+            return -np.inf
+
+        p_density =  lp + log_likelihood(theta, t, y, yerr)
+        
+        return p_density
+
+
+    
 
     plt.clf()
     fig = corner.corner(
@@ -289,7 +332,9 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
 
     counter += 1
 
-print('you did all 10')
+print('you successfully ran all chains')
+
+
 STOP
 
 
