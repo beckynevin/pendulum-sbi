@@ -3,25 +3,37 @@
 # Need to animate
 
 import numpy as np
+import math
 
 
 class pendulum:
     
-    def __init__(self, theta, t, noise):
+    def __init__(self, theta, t, noise, m = None, b = None):
 
         self.theta = theta
         self.t = t
         self.noise = noise
+
+        # Optional arguments: mass, friction
+        self.m = m if m is not None else 10.
+        self.b = b if b is not None else 0.
+        # Other optional arguments could be ????
+        # I'm not sure how to do this within theta because some of us have different thetas
         
         if not self.noise:
             # If it is not defined, then no noise
             self.noise = np.zeros(np.shape(theta))
-        
+    
+    # I want to add a function that will give you a cute animated pendulum:
     #def animate(self):
         
     
     def simulate_x(self):
-        ts = np.repeat(self.t[:, np.newaxis], self.theta.shape[0], axis=1)
+        theta = self.theta
+        t = self.t
+        noise = self.noise
+
+        ts = np.repeat(t[:, np.newaxis], theta.shape[0], axis=1)
 
 
         if theta.ndim == 1:
@@ -51,7 +63,9 @@ class pendulum:
             x[n,:] = np.array([Ls[i] * math.sin(theta_t[i]) for i, _ in enumerate(t)])
             
         return x
-    
+
+    # This needs to be fixed so that x, y, dx/dt, and dy/dt are all packaged together, also so mass is incorporated
+    # into the momentum:
     def simulate_q_p(self):
         ts = np.repeat(self.t[:, np.newaxis], self.theta.shape[0], axis=1)
 
@@ -96,6 +110,46 @@ class pendulum:
 
 
         return x, y, dx_dt, dy_dt
+
+    # This is from Sree, simulates an image of the 
+    def simulate_I(self):
+        # Using Taylor series expansion to solve for position (theta1) and velocity (theta2)
+        # output time, position and velocity as image i.e with dimenstions len(time) x 2: https://www.mackelab.org/sbi/tutorial/05_embedding_net/
+        m = self.m
+        l = self.theta[1]
+        g = self.theta[0]
+        b = self.b
+        dt = self.time[-1] - self.time[0]
+
+        # From here down this needs to be rewritten to work
+        theta1 = theta1_0
+        theta2 = theta2_0
+        data = [[theta1, theta2]]
+        for i, t_ in enumerate(time[:-1]):
+            next_theta1 = theta1 + theta2 * dt
+            next_theta2 = theta2 - (b/(m*l**2) * theta2 - g/l *
+                np.sin(next_theta1)) * dt
+
+            data.append([next_theta1, next_theta2])
+            theta1 = next_theta1
+            theta2 = next_theta2
+
+        data = torch.as_tensor(data) #shape : (len(time), 2)
+
+        nx = len(time)
+        ny = 2
+        I = torch.zeros(nx,ny)
+        for i in range(len(time)):
+            for j in range(2):
+                I[i,j] = data[i][j]
+
+        I = I.T
+        I = I.reshape(1,-1)
+
+        if return_points:
+            return I, data
+        else:
+            return I
         
     
     
