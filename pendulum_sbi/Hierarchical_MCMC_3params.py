@@ -326,76 +326,49 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
     nwalkers, ndim = pos.shape
     
     filename = 'MCMC_chains/alpha_chain_"+str(counter)+".h5'
-    backend_alpha = emcee.backends.HDFBackend(filename)
-    backend_alpha.reset(nwalkers, ndim)
+
+    if run:
+        backend_alpha = emcee.backends.HDFBackend(filename)
+        backend_alpha.reset(nwalkers, ndim)
 
   
 
-    # I'm getting an issue here with this sampling:
-    # ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-    # What's the difference between log_probability_alpha and the previous sampling?
-
-    '''
-   
-
-    def log_likelihood(theta, t, y, yerr):
-        model = simulator(theta, t = t)
-        sigma2 = yerr**2 
-        return -0.5 * np.sum((y - model) ** 2 / 2 * sigma2) #+ np.log(sigma2))
+        # I'm getting an issue here with this sampling:
+        # ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
     
-    
-
-    def likelihood_alpha(alpha, g):
-        a, b = alpha
-        #ratio = [x**(a-1)*(1-x)**(b-1) / log_prior_normal_g(x) for x in g]
-        return np.sum(g**(a-1)*(1-g)**(b-1) / log_prior_normal_g(g))
-    
-
-    '''
-
-    # what about just running the likelihood?
-
-    # def log_likelihood(theta, t, y, yerr):
-    # y is an array
-    theta_o = np.array([10, 5, np.pi/4])
-    time =  np.linspace(0, 10, 100)
-    y = pendulum(theta_o, time, noise).simulate_x()
-    yerr = 0.05 * np.ones(np.shape(y))
-    print('likelihood first level', log_likelihood(theta_o, t, y, yerr))
-
-    # def likelihood_alpha(alpha, g):
-    # g is an array
-    '''
-    log_prob_fn <function log_probability_alpha at 0x29a1c64c0>
-    args [ 9.14433045  9.56166164 11.94329579 ...  8.35384729 12.69354697
-    7.40143051]
-    kwargs None
-    '''
-    print('likelihood second level', likelihood_alpha(np.array([1,1]), [1,2,4],[5,10,22]))
-
-    print('g_array', np.shape(g_array))
-    print(g_array)
+        theta_o = np.array([10, 5, np.pi/4])
+        time =  np.linspace(0, 10, 100)
+        y = pendulum(theta_o, time, noise).simulate_x()
+        yerr = 0.05 * np.ones(np.shape(y))
+        print('likelihood first level', log_likelihood(theta_o, t, y, yerr))
 
     
-    sampler = emcee.EnsembleSampler(
-            nwalkers, ndim, log_probability_alpha, args = (xs, g_array[0]), backend = backend_alpha
-        )
-    #was args = (g_array[0])
-    # run it
-    sampler.run_mcmc(pos, 1000, progress=True);
+        print('likelihood second level', likelihood_alpha(np.array([1,1]), [1,2,4],[5,10,22]))
 
-    STOP
+        print('g_array', np.shape(g_array))
+        print(g_array)
 
+
+    
+        sampler = emcee.EnsembleSampler(
+                nwalkers, ndim, log_probability_alpha, args = (xs, g_array[0]), backend = backend_alpha
+            )
+
+        sampler.run_mcmc(pos, 1000, progress=True);
+    else:
+        
+        sampler = emcee.backends.HDFBackend(filename)
+
+    
 
     
 
     plt.clf()
     fig = corner.corner(
-        flat_samples, truths=[9.8, 5, np.pi/4],
+        flat_samples, truths=[3 , 3],
         labels=[
-            r"$g$",
-            r"$L$",
-            r"$\theta_0$",
+            r"$A$",
+            r"$B$",
         ],
         quantiles=[0.16, 0.5, 0.84],
         show_titles=True,
