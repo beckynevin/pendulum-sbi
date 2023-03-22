@@ -31,87 +31,22 @@ from sbi.analysis import pairplot
 import emcee
 import corner
 
-
+# modules that I wrote
+import sys
+sys.path.insert(0,"..") # this is so it can find pendulum_sbi
+from pendulum_sbi.pendulum import pendulum
 
 
 # setting the sigmas on the noise distribution
 # you will eventually draw the parameter values from a normal
 # distribution with the width given by these values
-noiz = [0.1,0.0,0.0] # here, there's only noise on g
+noise = [0.1,0.0,0.0] # here, there's only noise on g
 
 
-
-
-
-# This is the simulator
-# Given thetas, it outputs the x and y position (cartesian)
-# of the pendulum over a range of times
-# p and q are position and momentum
-
-# Option is to input the width of the noise normal distributions
-# around each parameter.
-# default is a bit of noise for each of the three parameters
-
-
-def simulator(theta, t = np.linspace(0, 10, 100), noise=[0.5,0.0,0.0]):
-    """
-    Return an t, x, y array for plotting based on params
-    Also introduces noise to parameter draws    
-    """
-
-    
-
-    # Decide on time, here I'm sampling a few oscillations, but this could be
-    # something you import or change
-    
-    
-    ts = np.repeat(t[:, np.newaxis], theta.shape[0], axis=1)
-
-
-    if theta.ndim == 1:
-        theta = theta[np.newaxis, :]
-    
-    # time to solve for position and velocity
-
-    # nested for loop, there's probably a better way to do this
-    # output needs to be (n,len(t))
-    x = np.zeros((theta.shape[0],len(t)))
-    y = np.zeros((theta.shape[0],len(t)))
-
-    # TO DO: I'm not strictly solving for momentum, just velocities:
-    dx_dt = np.zeros((theta.shape[0],len(t)))
-    dy_dt = np.zeros((theta.shape[0],len(t)))
-    for n in range(theta.shape[0]):
-
-        # Draw parameter (theta) values from normal distributions
-        # To produce noise in the thetas you are using to produce the position
-        # and momentum of the pendulum at each moment in time
-        # Another way to do this would be to just draw once and use that same noisy theta 
-        # value for all moments in time, but this would be very similar to just drawing
-        # from the prior, which we're already doing.
-    
-        gs = np.random.normal(loc=theta[n][0], scale=noise[0], size=np.shape(t))
-        Ls = np.random.normal(loc=theta[n][1], scale=noise[1], size=np.shape(t))
-        theta_os =  np.random.normal(loc=theta[n][2], scale=noise[2], size=np.shape(t))
-        
-        theta_t = np.array([theta_os[i] * math.cos(np.sqrt(gs[i] / Ls[i]) * t[i]) for i, _ in enumerate(t)])
-        
-        x[n,:] = np.array([Ls[i] * math.sin(theta_t[i]) for i, _ in enumerate(t)])
-        y[n,:] = np.array([-Ls[i] * math.cos(theta_t[i]) for i, _ in enumerate(t)])
-
-        # Okay and what about taking the time derivative?
-        dx_dt[n,:] = np.array([-Ls[i] * theta_os[i] * np.sqrt(gs[i] / Ls[i]) * math.cos(theta_t[i]) * math.sin( np.sqrt(gs[i] / Ls[i]) * t[i]) for i, _ in enumerate(t)])
-        dy_dt[n,:] = np.array([-Ls[i] * theta_os[i] * np.sqrt(gs[i] / Ls[i]) * math.sin(theta_t[i]) * math.sin( np.sqrt(gs[i] / Ls[i]) * t[i]) for i, _ in enumerate(t)])
-    
-
-   
-    
-
-    return x
 
 # Now set up the likelihood, which will rely on the simulator
 def log_likelihood(theta, t, y, yerr):
-    model = simulator(theta, t = t)
+    model = pendulum(theta, t, noise).simulate_x()
     sigma2 = yerr**2 
     return -0.5 * np.sum((y - model) ** 2 / 2 * sigma2) #+ np.log(sigma2))
 
@@ -181,10 +116,10 @@ def log_probability(theta, t, y, yerr):
 theta_o = np.array([10, 5, np.pi/4])
 time =  np.linspace(0, 10, 100)
 
-true_position = simulator(theta_o, t = time)
+true_position = pendulum(theta_o, time, noise).simulate_x()
 
 theta_o = np.array([9, 5, np.pi/4])
-offset_position = simulator(theta_o, t = time)
+offset_position = pendulum(theta_o, time, noise).simulate_x()
 
 
 
@@ -195,7 +130,7 @@ color_list = ['#F0A202','#F18805','#D95D39','#90B494','#7B9E89']
 for i, offset_gs in enumerate(np.linspace(5,15,5)):
     print(i, offset_gs)
     theta = np.array([offset_gs, 5, np.pi/4])
-    offset_position = simulator(theta, t = time)
+    offset_position = pendulum(theta, time, noise).simulate_x()
     plt.plot(time, offset_position.flatten(), color = color_list[i])
     plt.annotate(f'log L = {round(log_likelihood(theta, time, true_position, yerr = 1),2)}, g = {round(offset_gs, 2)}', 
         xy = (0.02, 0.3 - 0.05*i), xycoords = 'axes fraction', color = color_list[i])
@@ -236,7 +171,7 @@ theta_0_sample = np.random.normal(loc = mu_theta_0, scale = sigma_theta_0, size 
 plt.clf()
 for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
     theta = np.array([g, L, theta_0])
-    offset_position = simulator(theta, t = time)
+    offset_position = pendulum(theta, time, noise).simulate_x()
     plt.plot(time, offset_position.flatten())
 plt.show()
 
@@ -251,13 +186,15 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
     # Set up the backend
     # Don't forget to clear it in case the file already exists
         true = np.array([g, L, theta_0])
-        y = simulator(true, t = t)
+        y = pendulum(true, t, noise).simulate_x()
         yerr = 0.05 * np.ones(np.shape(y))
     
         backend = emcee.backends.HDFBackend(filename)
         backend.reset(nwalkers, ndim)
 
-
+        
+        # So the simple setup is that you have one true data array to input
+        # that is 100 t steps long and you're comparing to it
         sampler = emcee.EnsembleSampler(
             nwalkers, ndim, log_probability, args=(t, y, yerr), backend = backend
         )
@@ -291,27 +228,163 @@ for g, L, theta_0 in zip(g_sample, L_sample, theta_0_sample):
     print(flat_samples)
     # So for each of these we're just grabbing the g values?
     print(flat_samples[:,0])
+    g = flat_samples[:,0]
+
+    g_array = np.zeros((1,len(g)))
+    g_array[0,:] = np.array(g)
+    print(np.shape(g))
+    print(np.shape(g_array))
+
+    g_list = list(g)
+
+
+    
 
     # Now how do we solve for the best fit alpha values?
+    # The input to all of these needs to be alpha
+    # But were not inputting any data?
 
-    STOP
+    def log_prior_uniform_alpha(alpha):
+        a, b = alpha
 
-    def f(g, alpha):
+        if 0.0 < a < 10.0 and 0.0 < b < 10.0:
+            return 0.0    
+        return -np.inf
+    '''
+    def f(alpha, g):
         a, b = alpha
         return g**(a-1)*(1-g)**(b-1)
+    '''
 
-    def likelihood_alpha():
-        return np.sum(f(g,alpha)/log_prior_normal_g(g))
+    def likelihood_old_alpha(alpha, g):
+        a, b = alpha
+        
+        ratio = [x**(a-1)*(1-x)**(b-1) / log_prior_normal_g(x) for x in g]
+        return np.sum(ratio)
+
+    def simulate_a_b(alpha, g):
+        a, b = alpha
+        return [x**(a-1)*(1-x)**(b-1) / log_prior_normal_g(x) for x in g]
+
+    def likelihood_alpha(alpha, xs, g):
+        
+        model = simulate_a_b(alpha, g)
+        return np.sum(model)
+        #return np.sum(g**(a-1)*(1-g)**(b-1) / log_prior_normal_g(g))
+
+
+    '''
+    def log_likelihood(theta, t, y, yerr):
+        model = pendulum(theta, t, noise).simulate_x()
+        sigma2 = yerr**2 
+        return -0.5 * np.sum((y - model) ** 2 / 2 * sigma2) #+ np.log(sigma2))
+
+    '''
     
-    def log_probability(alpha, t, y, yerr):
+    def log_probability_alpha(alpha, xs, g):
     
-        lp = log_prior_normal(theta)
+        lp = log_prior_uniform_alpha(alpha)
         if not np.isfinite(lp):
             return -np.inf
 
-        p_density =  lp + log_likelihood(theta, t, y, yerr)
+        p_density =  lp + likelihood_alpha(alpha, xs, g)
         
         return p_density
+
+
+    # Fine, let's just calculate the likelihoods ourselves
+    a_list = np.linspace(1,50,10)
+    b_list = np.linspace(1,50,10)
+
+    xs = np.linspace(0,len(g_array[0])-1, len(g_array[0]))
+
+    a_s, b_s = np.meshgrid(a_list,b_list)
+    plt.clf()
+    likelihoods = []
+    for As in a_list:
+        for Bs in b_list:
+            print('log prob', log_probability_alpha([As,Bs], xs, g_list))
+            likelihoods.append(likelihood_alpha([As,Bs], xs, g_list))
+    
+    
+    plt.scatter(a_s, b_s, c = likelihoods)
+    plt.xlabel('A values')
+    plt.ylabel('B values')
+    plt.colorbar()
+    
+    plt.show()
+
+
+    
+
+    start = np.array([5, 5])
+
+    pos = start + np.array([1e0,1e0]) * np.random.randn(32, 2)
+
+    print('starting position', pos)
+
+    nwalkers, ndim = pos.shape
+    
+    filename = 'MCMC_chains/alpha_chain_"+str(counter)+".h5'
+    backend_alpha = emcee.backends.HDFBackend(filename)
+    backend_alpha.reset(nwalkers, ndim)
+
+  
+
+    # I'm getting an issue here with this sampling:
+    # ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+    # What's the difference between log_probability_alpha and the previous sampling?
+
+    '''
+   
+
+    def log_likelihood(theta, t, y, yerr):
+        model = simulator(theta, t = t)
+        sigma2 = yerr**2 
+        return -0.5 * np.sum((y - model) ** 2 / 2 * sigma2) #+ np.log(sigma2))
+    
+    
+
+    def likelihood_alpha(alpha, g):
+        a, b = alpha
+        #ratio = [x**(a-1)*(1-x)**(b-1) / log_prior_normal_g(x) for x in g]
+        return np.sum(g**(a-1)*(1-g)**(b-1) / log_prior_normal_g(g))
+    
+
+    '''
+
+    # what about just running the likelihood?
+
+    # def log_likelihood(theta, t, y, yerr):
+    # y is an array
+    theta_o = np.array([10, 5, np.pi/4])
+    time =  np.linspace(0, 10, 100)
+    y = pendulum(theta_o, time, noise).simulate_x()
+    yerr = 0.05 * np.ones(np.shape(y))
+    print('likelihood first level', log_likelihood(theta_o, t, y, yerr))
+
+    # def likelihood_alpha(alpha, g):
+    # g is an array
+    '''
+    log_prob_fn <function log_probability_alpha at 0x29a1c64c0>
+    args [ 9.14433045  9.56166164 11.94329579 ...  8.35384729 12.69354697
+    7.40143051]
+    kwargs None
+    '''
+    print('likelihood second level', likelihood_alpha(np.array([1,1]), [1,2,4],[5,10,22]))
+
+    print('g_array', np.shape(g_array))
+    print(g_array)
+
+    
+    sampler = emcee.EnsembleSampler(
+            nwalkers, ndim, log_probability_alpha, args = (xs, g_array[0]), backend = backend_alpha
+        )
+    #was args = (g_array[0])
+    # run it
+    sampler.run_mcmc(pos, 1000, progress=True);
+
+    STOP
 
 
     
