@@ -1,0 +1,7 @@
+# This is a yaml file for importing things for the pendulum
+POPULATION:
+  PLANCK2018:
+    flat: True
+    h0: 60.7 # These could also be an uniform distribution
+
+DISTRIBUTIONS:
