@@ -54,6 +54,7 @@ def model(eta, t):
     return model
 
 
+
 # Now set up the likelihood, which will rely on the simulator
 def log_likelihood(eta, t, x, yerr):
     x_model = model(eta, t)
